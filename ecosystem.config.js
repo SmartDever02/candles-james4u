@@ -3,7 +3,7 @@ module.exports = {
         name: 'miner3110',
         script: './miner_skx1_miner3110', // Update this to your miner script
         interpreter: '/bin/bash',
-        cwd: '/root/candles',
+        cwd: '/root/candles-james4u',
         instances: 1,
         autorestart: true,
         watch: false,
