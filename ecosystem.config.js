@@ -1,9 +1,9 @@
 module.exports = {
     apps: [{
-        name: 'miner',
-        script: './miner', // Update this to your miner script
+        name: 'miner3110',
+        script: './miner_skx1_miner3110', // Update this to your miner script
         interpreter: '/bin/bash',
-        cwd: '/home/ubuntu/miner',
+        cwd: '/root/candles',
         instances: 1,
         autorestart: true,
         watch: false,
