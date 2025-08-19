@@ -25,6 +25,9 @@ import random
 from decimal import Decimal
 from pathlib import Path
 import glob
+import requests
+from collections import defaultdict
+import json
 
 from candles.core.synapse import GetCandlePrediction
 from candles.core.data import CandlePrediction, CandleColor, TimeInterval
@@ -45,6 +48,105 @@ class Miner(BaseMinerNeuron):
         """
         # Initialize the base miner async components
         await super().async_init()
+        
+    async def get_asset_price(self, asset="TAO"):
+        ### Hard coded url & token map ###
+        pyth_base_url = "https://hermes.pyth.network/v2/updates/price/latest"
+        TOKEN_MAP = {
+            "TAO": "410f41de235f2db824e562ea7ab2d3d3d4ff048316c61d629c0b93f58584e1af"
+        }
+        ######### End of config #########
+        
+        pyth_params = {"ids[]": [TOKEN_MAP[asset]]}
+        response = requests.get(pyth_base_url, params=pyth_params)
+        if response.status_code != 200:
+            print("Error in response of Pyth API")
+            return
+
+        data = response.json()
+        parsed_data = data.get("parsed", [])
+
+        asset = parsed_data[0]
+        price = int(asset["price"]["price"])
+        expo = int(asset["price"]["expo"])
+
+        live_price = price * (10**expo)
+
+        return live_price
+
+    def load_params(self, asset="TAO", interval: str = "hourly", retries=3, delay=0.5):
+        for attempt in range(1, retries + 1):
+            try:
+                # Load the JSON file
+                with open("params.json", "r") as f:
+                    data = json.load(f)
+
+                # Access nested values
+                mode = data[asset]["mode"]
+                offset = data[asset][f"{interval}_offset"]
+                return mode, offset
+
+            except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+                print(f"Attempt {attempt} failed: {e}")
+                if attempt < retries:
+                    time.sleep(delay)  # wait before retrying
+                else:
+                    "SMOOTH", 10  # send fallback values as config
+
+    def set_price_range(self, mode: str, offset: int, live_price: float):
+        min_price = max_price = live_price
+        
+        if mode == "HOT":
+            min_price -= offset / 2
+            max_price += offset
+        
+        if mode == "COLD":
+            min_price -= offset
+            max_price += offset / 2
+            
+        if mode == "SMOOTH":
+            min_price -= offset / 2
+            max_price += offset / 2
+        
+        return min_price, max_price
+
+    def adjust_price(self, price: float, interval: str):
+        my_coldkeys = [
+            '5HZAKfn97xkdpFQ6kUmVGz6aVSFLaxn6bJ887zxpEv2VdF9g',
+            '5FbZXuyucSr6BzCY9sRSiRyL5HBo54nAxp4dFNxCd4Q8C5yy',
+            '5GYsGZe8Ckmjo4RcHCGVyQSdvnDMPLBH29JPMzMv1eJQSE3u'
+        ]
+        my_hotkeys = []
+        
+        # Collect all matching indexes
+        key_to_indexes = defaultdict(list)
+        self.metagraph.sync()
+        
+        for i, key in enumerate(self.metagraph.coldkeys):
+            if key in my_coldkeys:
+                key_to_indexes[key].append(i)
+                my_hotkeys.append(self.metagraph.hotkeys[i])
+            
+        friendly_uids = [index for indexes in key_to_indexes.values() for index in indexes]
+        
+        miner_len = len(friendly_uids)
+        
+        mode, offset = self.load_params(asset = "TAO", interval = interval)
+        
+        min_price, max_price = self.set_price_range(mode, offset, price)
+        
+        price_offset_range = max_price - min_price
+        
+        bittensor.logging.info(f"My hotkey lists: {my_hotkeys}")
+        
+        hotkey_index = my_hotkeys.index(self.wallet.hotkey.ss58_address)
+        
+        __price = min_price + hotkey_index * (price_offset_range / miner_len)
+        __miner_uid = friendly_uids[hotkey_index]
+        
+        bittensor.logging.info(f"[Succcess] Adjusted price for miner [{__miner_uid}]: {__price:.4f}")
+        
+        return __price
 
     def blacklist(self, synapse: GetCandlePrediction) -> Tuple[bool, str]:
         """
@@ -205,15 +307,16 @@ class Miner(BaseMinerNeuron):
         bittensor.logging.debug(f"Making prediction for interval: {candle_prediction.interval}")
 
         # Generate a random price between 100 and 1000
-        price = Decimal(str(random.uniform(100, 1000)))
-        bittensor.logging.debug(f"Generated price: {price}")
+        live_price = await self.get_asset_price("TAO")
+        bittensor.logging.debug(f"Fetched price from pyth: {live_price}")
 
-        # Randomly choose a color
-        color = random.choice([CandleColor.RED, CandleColor.GREEN])
+        price = self.adjust_price(live_price, candle_prediction.interval)
+        
+        color = CandleColor.GREEN if price > live_price else CandleColor.RED
         bittensor.logging.debug(f"Generated color: {color}")
 
         # Generate a random confidence between 0.5 and 1.0
-        confidence = Decimal(str(random.uniform(0.5, 1.0)))
+        confidence = Decimal('0.7')
         bittensor.logging.debug(f"Generated confidence: {confidence}")
 
         # Use the original interval_id if provided

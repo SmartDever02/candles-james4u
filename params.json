@@ -1,0 +1,11 @@
+{
+  "TAO": {
+    "mode": "HOT",
+    "mode_options": "HOT, SMOOTH, COLD",
+    "offset": 20,
+    "hourly_offset": 5,
+    "daily_offset": 10,
+    "weekly_offset": 10,
+    "monthly_offset": 15
+  }
+}
