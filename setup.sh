@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_URL="https://github.com/SmartDever02/candles-james4u.git"
 REPO_NAME="candles-james4u"
 REPO_BRANCH="james4u"
-CHECKOUT_DIR="$HOME/apps"          # change where you want the repo cloned
+CHECKOUT_DIR="$HOME"          # change where you want the repo cloned
 MINER_SCRIPT="./setup_miner.sh"
 MINER_ARGS=("ghost1" "miner3140")  # args to pass to setup_miner.sh
 #=========================================
