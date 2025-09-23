@@ -79,6 +79,14 @@ if [ -f "$HOME/.local/bin/env" ]; then
   append_once 'source "$HOME/.local/bin/env"' "$RC_FILE"
 fi
 
+#--- Bittensor CLI (btcli) ------------------------------------------------
+if command -v btcli >/dev/null 2>&1; then
+  log "btcli already installed: $(btcli --version || echo 'unknown version')"
+else
+  log "Installing Bittensor CLI (btcli) via uv pip"
+  uv pip install --system bittensor-cli
+fi
+
 #--- Node.js + npm (Ubuntu repo) ------------------------------------------
 if command -v node >/dev/null 2>&1; then
   log "Node.js already installed: $(node -v)"
