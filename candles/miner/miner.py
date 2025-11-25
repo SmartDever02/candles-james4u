@@ -21,6 +21,7 @@ from typing import Tuple
 import os
 import bittensor
 from datetime import datetime, timezone
+import time
 import random
 from decimal import Decimal
 from pathlib import Path
@@ -312,7 +313,12 @@ class Miner(BaseMinerNeuron):
 
         price = self.adjust_price(live_price, candle_prediction.interval)
         
-        color = CandleColor.GREEN if price > live_price else CandleColor.RED
+        # Randomly choose a color
+        color = random.choices(
+            [CandleColor.RED, CandleColor.GREEN],
+            weights=[40, 60],
+            k=1
+        )[0]
         bittensor.logging.debug(f"Generated color: {color}")
 
         # Generate a random confidence between 0.5 and 1.0
