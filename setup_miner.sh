@@ -179,8 +179,14 @@ fi
 
 # Fallback to local IP if external IP detection fails
 if [ -z "$EXTERNAL_IP" ]; then
-    print_warning "Could not detect external IP, using local IP"
-    EXTERNAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || echo "")
+    print_warning "Could not detect external IP, trying local IP"
+    local_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || echo "")
+    if is_valid_ip "$local_ip"; then
+        EXTERNAL_IP="$local_ip"
+    else
+        print_error "Failed to detect any valid IP address"
+        exit 1
+    fi
 fi
 
 print_status "Using IP address: $EXTERNAL_IP"
