@@ -126,8 +126,14 @@ EXTERNAL_IP=""
 # Function to validate if response is a valid IP address
 is_valid_ip() {
     local ip=$1
-    # Check if it's a valid IPv4 address (basic validation)
-    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    if [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        local IFS='.'
+        read -ra octets <<< "$ip"
+        for octet in "${octets[@]}"; do
+            if ((octet > 255)); then
+                return 1
+            fi
+        done
         return 0
     fi
     return 1
