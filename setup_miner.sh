@@ -126,30 +126,46 @@ EXTERNAL_IP=""
 # Function to validate if response is a valid IP address
 is_valid_ip() {
     local ip=$1
-    if [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-        local IFS='.'
-        read -ra octets <<< "$ip"
-        for octet in "${octets[@]}"; do
-            if ((octet > 255)); then
-                return 1
-            fi
-        done
-        return 0
+    # Check basic format first
+    if [[ ! $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        return 1
     fi
-    return 1
+
+    # Validate each octet is in range 0-255
+    local IFS='.'
+    local octets
+    read -ra octets <<< "$ip"
+
+    # Ensure we have exactly 4 octets
+    if [ ${#octets[@]} -ne 4 ]; then
+        return 1
+    fi
+
+    for octet in "${octets[@]}"; do
+        # Check if octet is numeric
+        if ! [[ "$octet" =~ ^[0-9]+$ ]]; then
+            return 1
+        fi
+        # Check if octet is in valid range (0-255)
+        if [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ] 2>/dev/null; then
+            return 1
+        fi
+    done
+
+    return 0
 }
 
 # Function to get IP from a service
 get_ip_from_service() {
     local url=$1
     local result=""
-    
+
     if command -v curl &> /dev/null; then
         result=$(curl -s -4 --max-time 5 "$url" 2>/dev/null | tr -d '\n\r' | grep -oE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' | head -1)
     elif command -v wget &> /dev/null; then
         result=$(wget -qO- -4 --timeout=5 "$url" 2>/dev/null | tr -d '\n\r' | grep -oE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' | head -1)
     fi
-    
+
     if is_valid_ip "$result"; then
         echo "$result"
         return 0
@@ -160,7 +176,7 @@ get_ip_from_service() {
 # Try multiple IP detection services
 if command -v curl &> /dev/null || command -v wget &> /dev/null; then
     print_status "Trying IP detection services..."
-    
+
     # List of services to try
     services=(
         "https://api.ipify.org"
@@ -172,7 +188,7 @@ if command -v curl &> /dev/null || command -v wget &> /dev/null; then
         "https://checkip.amazonaws.com"
         "https://ipecho.net/plain"
     )
-    
+
     for service in "${services[@]}"; do
         result=$(get_ip_from_service "$service")
         if is_valid_ip "$result"; then
